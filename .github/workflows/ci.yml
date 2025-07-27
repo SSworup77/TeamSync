@@ -1,0 +1,88 @@
+# .github/workflows/ci.yml
+name: CI Pipeline
+
+# Trigger the workflow on push and pull requests to develop branch
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  # Client (React + TypeScript + Vite) job
+  client:
+    name: Client Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: "client/package-lock.json"
+
+      - name: Install client dependencies
+        run: |
+          cd client
+          npm ci
+
+      - name: Run client linting
+        run: |
+          cd client
+          npm run lint
+        continue-on-error: true
+
+      - name: Build client
+        run: |
+          cd client
+          npm run build
+
+  # Backend (Node.js + TypeScript + MongoDB) job
+  backend:
+    name: Backend Build
+    runs-on: ubuntu-latest
+
+    # MongoDB service
+    services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: "backend/package-lock.json"
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Build backend
+        run: |
+          cd backend
+          npm run build
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [client, backend]
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "CI Pipeline completed!"
+          echo "Client: ${{ needs.client.result }}"
+          echo "Backend: ${{ needs.backend.result }}"
